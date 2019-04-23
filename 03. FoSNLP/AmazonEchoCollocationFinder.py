@@ -20,14 +20,18 @@ for i in range(1000):
     reviews = (reviews + " " + data[i])
 
 # Remove apostrophes:
-reviews = reviews.replace("'", "")
-
+# reviews = reviews.replace("'", "")
+# Convert to lower case:
+reviews = reviews.lower()
 # Identifying collocations ====================================================
 
 # Initialize our tokenizer to grab words only
-tokenizer = nltk.RegexpTokenizer(r'\w+')
+tokenizer = nltk.RegexpTokenizer(r'\w+\'?\w+')
 # Use our tokenizer to tokenize our review
 reviewTokens = tokenizer.tokenize(reviews)
+
+# reviewTokens = nltk.word_tokenize(reviews)
+
 # Retrieve a list of bigrams
 tokenBigrams = list(nltk.bigrams(reviewTokens))
 # Convert bigrams to strings
@@ -66,7 +70,7 @@ test = tokenBigramsPOS[0]
 test[1][1]
 
 # Look at tag names to find nouns and adjectives
-nltk.help.upenn_tagset()
+# nltk.help.upenn_tagset()
 
 myAdjectives = ["JJ", "JJR", "JJS"]
 myNouns = ["NN", "NNP", "NNPS", "NNS"]
@@ -93,3 +97,4 @@ usefulFrequency.sort(key = lambda x:x[2], reverse = True)
 usefulFrequency[:10]
 
 # Brilliant! They look like very relevant text for our Amazon Echo reviews!
+# But why are we getting "t" as a character?
