@@ -97,4 +97,3 @@ usefulFrequency.sort(key = lambda x:x[2], reverse = True)
 usefulFrequency[:10]
 
 # Brilliant! They look like very relevant text for our Amazon Echo reviews!
-# But why are we getting "t" as a character?
