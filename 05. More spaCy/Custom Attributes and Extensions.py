@@ -1,5 +1,11 @@
-# Building classification model:
+# Some more spacy
 
+# In this script we look at the airline_tweets dataset from kaggle and customise our
+# spacy pipeline. We add a true/false indicator to determine if tokens are a twitter
+# profile or a hashtag. We also add a custom entity to tell us the recipients of 
+# each tweet.
+
+# Import pandas for data work
 import pandas as pd
 
 # Read the data
@@ -10,27 +16,10 @@ data.head()
 data.info()
 
 # Select the columns we want (the text and the sentiment for sentiment analysis)
-data = data[["text","airline_sentiment"]]
-
-# Rename sentiment column for ease of typing
-data.columns = ["text", "sentiment"]
-
-# Take another look
-data.head()
-
-# What types of sentiment do we have?
-data.sentiment.unique()
-
-# Plot the distribtuion of tweet sentiment
-data.sentiment.value_counts().plot.bar()
-# many more negative reviews (as expected)
-
-# Split data into text and sentiment
-X = data["text"]
-y = data["sentiment"]
+data = data["text"]
 
 # Grab test tweet
-test = X[1]
+test = data[1]
 
 # Import spacy for nlp ========================================================
 import spacy
