@@ -1,10 +1,3 @@
-# Some more spacy
-
-# In this script we look at the airline_tweets dataset from kaggle and customise our
-# spacy pipeline. We add a true/false indicator to determine if tokens are a twitter
-# profile or a hashtag. We also add a custom entity to tell us the recipients of 
-# each tweet.
-
 # Import pandas for data work
 import pandas as pd
 
@@ -16,10 +9,27 @@ data.head()
 data.info()
 
 # Select the columns we want (the text and the sentiment for sentiment analysis)
-data = data["text"]
+data = data[["text","airline_sentiment"]]
+
+# Rename sentiment column for ease of typing
+data.columns = ["text", "sentiment"]
+
+# Take another look
+data.head()
+
+# What types of sentiment do we have?
+data.sentiment.unique()
+
+# Plot the distribtuion of tweet sentiment
+data.sentiment.value_counts().plot.bar()
+# many more negative reviews (as expected)
+
+# Split data into text and sentiment
+X = data["text"]
+y = data["sentiment"]
 
 # Grab test tweet
-test = data[1]
+test = X[13]
 
 # Import spacy for nlp ========================================================
 import spacy
@@ -47,35 +57,65 @@ for i, token in enumerate(doc):
 tokenized_text
 
 
-# Add custom is_hashtag and is_profile token attributes =======================
+# Add custom is_profile token attribute =======================================
 from spacy.tokens import Doc, Token
 
 def get_is_profile(token):
     """ Returns true if the first character of a word is an "at" symbol @. """
-    return True if token.text[0] == "@" else False
-    
-def get_is_hashtag(word):
-    """ Returns true if the first character of a word is a hash symbol #. """
-    return True if token.text[0] == "#" else False
-
+    return token.text.startswith('@')
+ 
 # Initialize our new token attributes (leaving it here would give us our attributes
 # but would read false for all tokens in our document)
 Token.set_extension('is_profile', force = True, getter = get_is_profile)
-Token.set_extension('is_hashtag', force = True,  getter = get_is_hashtag)
 
 # Re-Tokenize our data
 doc = nlp(test)
 
-# Generate a dataframe view of our tokens with their two new attributes
-tokenized_text = pd.DataFrame()
+# Print our tokens and our boolean for is profile or is hashtag
+print([(token.text, token._.is_profile) for token in doc])
+
+
+# Fix Hashtag tokenization ====================================================
+def hashtag_pipe(doc):
+    merged_hashtag = False
+    while True:
+        # Iterate through tokens in the document
+        for token_index,token in enumerate(doc):
+            # Check if token is a # symbol
+            if token.text == '#':
+            # Check if a head exists for the token
+                if token.head is not None:
+                    # Set the start index for the token as the current index
+                    start_index = token.idx
+                    # Set the end index as the end of the head word
+                    end_index = start_index + len(token.head.text) + 1
+                    if doc.merge(start_index, end_index) is not None:
+                        merged_hashtag = True
+                        break
+        if not merged_hashtag:
+            break
+        merged_hashtag = False
+    return doc
+
+# add our hashtag pipe to our pipeline
+nlp.add_pipe(hashtag_pipe)
+
+# Re-Tokenize our text
+doc = nlp(test)
 
 # Print our tokens and our boolean for is profile or is hashtag
-print([(token.text, token._.is_profile, token._.is_hashtag) for token in doc])
+print([(token.text, token._.is_profile) for token in doc])
+
+# Our hashtag atribute is no longer working but we'll move on to classification
+
+
+
+
+
 
 # Add custom entity "recipients" ==============================================
 # This will allow us to neatly get the recipient for each tweet
 from spacy.matcher import Matcher
-
 # Define our get recipient function that creates a matcher and finds matches
 def get_recipients(doc):
     
@@ -95,7 +135,6 @@ def get_recipients(doc):
            
     # Return our list of recipients    
     return recipients
-
 
 # Set our new doc extension (we imported doc earlier when we imported Token)
 Doc.set_extension("recipients", getter = get_recipients, force = True)
