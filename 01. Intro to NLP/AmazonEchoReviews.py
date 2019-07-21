@@ -176,3 +176,64 @@ for alpha in alphas:
     print('Alpha: ', alpha)
     print('Score: ', train_and_predict(alpha))
     print()
+    
+    
+# Can we build something more sophisticated? ==================================
+
+# Let's try xgboost:
+import xgboost as xgb    
+
+# Update ytrain for xgboost modeL (must be 0-n)
+y_train_xgb = y_train - 1
+y_test_xgb = y_test - 1
+
+# Create dmatrix for xgboost modelling
+train_dmatrix = xgb.DMatrix(count_train, label=y_train_xgb)
+test_dmatrix = xgb.DMatrix(count_test)
+
+# Set up parameters for xgboost model
+param = {
+    'max_depth': 3,
+    'eta': 0.3,
+    'objective': 'multi:softprob',
+    'num_class':5
+}
+
+# Build CV model
+xgb.cv(
+    params = param,
+    dtrain = train_dmatrix,
+    num_boost_round = 1000,
+    nfold = 3,
+    early_stopping_rounds = 10,
+    seed = 101
+)
+
+# Build final model on full training data set
+xgb_model = xgb.train(
+    params = param,
+    dtrain = train_dmatrix,
+    num_boost_round = 44)
+
+# Plot feature importance
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(6,9))
+xgb.plot_importance(xgb_model, max_num_features=50, height=0.8, ax=ax)
+plt.show()
+
+# Predict on our test set
+prediction_probs = xgb_model.predict(test_dmatrix)
+
+# Get our final predictions by taking the most "probable" class from our prediction probs
+final_preds = [np.argmax(x) for x in prediction_probs]
+
+# Get our accuracy score and print it
+score = metrics.accuracy_score(y_test_xgb, final_preds)
+print("XGBoost Model gives accuracy of {}.".format(round(score, 2)))
+
+
+
+
+
+

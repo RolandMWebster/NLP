@@ -1,10 +1,10 @@
-# Import pandas for data work
+# Import pandas for data work =================================================
 import pandas as pd
 
-# Read the data
+# Read the data ===============================================================
 data = pd.read_csv("C:/Users/Roland/Documents/git_repositories/NLP/airline_tweets_train.csv")
 
-# Examine the data
+# Examine the data ============================================================
 data.head()
 data.info()
 
@@ -116,14 +116,13 @@ def clean_text(text):
     return text.strip().lower()    
 
 # Vectorizer ==================================================================
-from sklearn.feature_extraction.text import CountVectorizers
+from sklearn.feature_extraction.text import CountVectorizer
 
 vectorizer = CountVectorizer(tokenizer = spacy_tokenizer, ngram_range = (1,1))
 
     
 # Classifier ==================================================================
 from sklearn.svm import SVC
-from sklearn.naive_bayes import MultinomialNB
 
 # Create Pipeline =============================================================
 from sklearn.pipeline import Pipeline
@@ -143,11 +142,12 @@ y = data["sentiment"]
 X_train, X_test, y_train,  y_test = train_test_split(X, y, test_size = 0.3, random_state = 27)
 
 # Grid Search CV ==============================================================
-from sklearn.grid_search import GridSearchCV
+from sklearn.model_selection import GridSearchCV
 import numpy as np
 
 parameters = {'SVM__C':np.arange(100, 1000, 100),
-              'SVM__kernel':["linear", "rbf"]}
+              'SVM__kernel':["linear", "rbf"],
+              'SVM__gamma':["scale"]}
 
 cv = GridSearchCV(pipe, parameters, cv = 3)
 
@@ -170,6 +170,10 @@ predictions = cv.predict(X_test)
 
 np.unique(predictions, return_counts = True)
 
+# Confusion matrix ============================================================
+from sklearn.metrics import confusion_matrix
+# Build the confusion matrix
+confusion_matrix(y_test, predictions)
 
 # Let's write our own reviews and see how the model does ======================
 
@@ -178,15 +182,149 @@ my_negative_tweet = ["I had an awful flight with @VirginAmerica!"]
 
 # Predict
 print("Positive Tweet Predicted: {} \nNegative Tweet Predicted: {}".format(cv.predict(my_positive_tweet), cv.predict(my_negative_tweet)))
-
-
-print(cv.predict(my_negative_tweet))
 # It gets the good flight review but it labels the bad flight review as neutral.
-# Maybe the word "awful" isn't used very often over here in the states! Let's swap
-# out our words.
-my_positive_tweet = ["I had a delightful flight with @VirginAmerica!"]
-my_negative_tweet = ["I had a really terrible flight with @VirginAmerica! I'll never fly with them again!"]
 
-print("Positive Tweet Predicted: {} \nNegative Tweet Predicted: {}".format(cv.predict(my_positive_tweet), cv.predict(my_negative_tweet)))
+# Testing a MultinomialNB approach ============================================
+from sklearn.naive_bayes import MultinomialNB
 
-# Interesting!
+# Create a new pipeline with MNB
+stepsNB = [("cleaner", predictors()),
+         ("vectorizer", vectorizer),
+         ("MNB", MultinomialNB())]
+
+pipeNB = Pipeline(stepsNB)
+
+parametersNB = {"MNB__alpha":np.arange(1,10,1)}
+
+
+cvNB = GridSearchCV(pipeNB, parametersNB, cv = 5)
+
+cvNB.fit(X_train, y_train)
+
+cvNB.best_params_
+print("Best score for SVM: {}".format(cvNB.best_score_))
+print("Best score for NB: {}".format(cv.best_score_))
+
+
+# Using a TFIDF Vector ========================================================
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+vectorizertfidf = TfidfVectorizer(tokenizer = spacy_tokenizer, ngram_range = (1,1))
+
+# New steps
+stepstfidf = [("cleaner", predictors()),
+         ("vectorizer", vectorizertfidf),
+         ("SVM", SVC())]
+# New pipeline
+pipetfidf = Pipeline(stepstfidf)
+
+# New parameters
+parameterstfidf = {'SVM__C':np.arange(100, 1000, 100),
+                   'SVM__kernel':["linear", "rbf"],
+                   'SVM__gamma':["scale"]}
+# Grid Search
+cvtfidf = GridSearchCV(pipetfidf, parameterstfidf, cv = 5)
+
+cvtfidf.fit(X_train, y_train)
+
+print("TFIDF Training Score: {}".format(cvtfidf.best_score_))
+print("TFIDF Parameters: {}".format(cvtfidf.best_params_))
+print("TFIDF Test Score: {}".format(cvtfidf.score(X_test, y_test)))
+
+
+
+# Playground ==================================================================
+    
+# Custom models class
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.base import TransformerMixin
+
+# Custom transformer using spacy
+class models(TransformerMixin):
+    
+    def __init__(self, models, params):
+        # Once initialized, calling my_models.svm should give my SVM classifier
+        self.models = models
+        self.params = params
+        self.keys = models.keys()
+        self.fits = {}
+    
+    def fit(self, X, y, cv = 3):
+        # Iterate through each key (each model)
+        for key in self.keys:
+            # Get model and parameters
+            model = self.models[key]
+            params = self.params[key]
+            # Initialize grid search instance for current model and its parameters
+            gridcv = GridSearchCV(model, params, cv = 3)
+            # Fit data to model
+            gridcv.fit(X,y)
+            # Build dictionary
+            self.fits[key] = gridcv
+          
+    def predict(self, X):
+        """
+        Returns predictions for each model provided in the model dictionary.
+        """
+        # Initialize predictions dictionary
+        predictions = {}
+        # Iterate through each key (each model)
+        for key in self.keys:
+            # Get fitted model
+            model = self.fits[key]
+            # Add response predictions to predictions dictionary                      
+            predictions[key] = model.predict(X)
+        # Create dataframe of predictions
+        output = pd.DataFrame(predictions)
+        # Return output dataframe
+        return output
+    
+    def score(self, X, y):
+        """
+        Returns accuracy scores for each model provided in the model dictionary.
+        """
+        # Initialize scores dictionary    
+        scores = {}    
+        # Iterate through each key (each model)
+        for key in self.keys:
+            # Get fitted model
+            model = self.fits[key]
+            # Get accuracy for current model
+            scores[key] = model.score(X,y)
+        # Create dataframe of accuracy scores                   
+        output = pd.DataFrame(scores, index = [0])
+        # Return dataframe of accuracy scores
+        return output
+
+# Models
+models1 = {"SVM":SVC(),
+           "LOGREG":LogisticRegression(),
+           "NaiveBayes":MultinomialNB()}
+
+params1 = {"SVM":{"C":np.arange(1,10,1),
+                  "kernel":["linear", "rbf"]},
+           "LOGREG":{"penalty":["l1","l2"]},
+           "NaiveBayes":{"alpha":np.arange(1,10,1)}}
+
+
+# New steps
+steps = [("cleaner", predictors()),
+         ("vectorizer", vectorizertfidf),
+         ("classifiers", models(models1, params1))]
+# New pipeline
+pipeline = Pipeline(steps)
+
+# Fit pipeline to data
+pipeline.fit(X_train, y_train)
+
+# Check scores
+for model in models1.keys():
+    print(model + ": " + str(pipeline["classifiers"].fits[model].best_score_))
+
+# Get test scores for each model
+scores = pipeline.score(X_test, y_test)
+
+
+
+
