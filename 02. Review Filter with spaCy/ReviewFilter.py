@@ -40,13 +40,13 @@ data = data[['verified_reviews','rating']]
 data.head(n = 5)
 # HYPOTHETICAL: Let's say we are interested in buying the Amazon Echo but we've
 # heard some concerns from our friends that the sound quality isn't very good.
-# Let's see if we can filter reviews based on a typical search like question
-# to give us a list of reviews that might help us.
+# Let's see if we can filter reviews based on a question to give us a list of 
+# reviews that might help us.
     
 # WORKFLOW:
 # 1. Pull important words from our search string
 # 2. Match the important words in our reviews
-# 3. Pull reviews in some kind of order.
+# 3. Pull reviews ordered my match count.
 
 # Search string:
 searchString = "Is the sound quality of Amazon Echo good?"
@@ -65,9 +65,75 @@ doc = nlp(searchString)
 # of objects or products are frequently recycled other words, such as Echo, we don't
 # want to return "echoed" or "echoing" if someone searches about the Amazon Echo.
 # We'll use lower for PROPN to take care of capitalization:
+# adjPatterns = [[{'LEMMA' : token.text}] for token in doc if token.pos_ == "ADJ"]
 
-adjPatterns = [[{'LEMMA' : token.text}] for token in doc if token.pos_ == "ADJ"]
-propnPatterns = [[{'LOWER' : token.text}] for token in doc if token.pos_ == "PROPN"]
+# propnPatterns = [[{'LOWER' : token.text}] for token in doc if token.pos_ == "PROPN"]
+
+# adjPatterns = [[{'LEMMA' : token.text},{'POS':'NOUN', 'OP' : '?'}] for token in doc if token.pos_ == "ADJ"]
+
+# queryPattern1 = [{'POS' : 'ADJ'}]
+# queryPattern2 = [{'POS' : 'ADJ'}, {'POS':'NOUN', 'OP' : '?'}]
+# queryPattern3 = [{'POS':'NOUN', 'OP' : '?'}, {'POS' : 'ADJ'}]
+
+queryPattern = [{'POS':'NOUN', 'OP' : '?'}, {'POS' : 'ADJ'}, {'POS':'NOUN', 'OP' : '?'}]
+
+# queryPatterns = [queryPattern1, queryPattern2, queryPattern3]
+
+matcher = Matcher(nlp.vocab)
+
+# for pattern in queryPatterns: matcher.add("pattern", None, pattern)
+
+matcher.add("QUERY_PATTERN", None, queryPattern)
+
+matches = matcher(doc)  
+
+# iterate over our match object to create a span object
+for match_id, start, end in matches:
+    matched_span = doc[start:end]
+    print(matched_span.text)
+
+# Now we can tokenize these words and create patterns as combinations of these words:
+keyWords = []
+
+for match_id, start, end in matches:
+    matched_span = doc[start:end]
+    keyWords = keyWords + [str(matched_span)]
+
+# We receive nested lists. We want to create bigrams of all the words found (regardless
+# of where/how they were found). So first we need to split our current bigrams into
+# single words:
+    
+# Split bigrams
+keyWords = [keyword.split(" ") for keyword in keyWords]
+
+# Join to 1 list of matched words
+individualKeyWords = []
+# Merge:
+for i in keyWords:
+    individualKeyWords = individualKeyWords + i
+
+
+# Now we have our matched words. We can create bigrams as all possible combinations
+# of these words:
+def pairWords(words):
+    """ Iterates through lists of keywords to create pairs of those keywords in a
+        new list object. """
+    # Intialize bigrams list:
+    bigrams = []     
+    # Iterate through all words. Importantly we grab our first word for the bigram here
+    for firstword in words:
+        # Construct a list of remaining words:
+        remainingwords = [word for word in words if word != firstword]
+        # Iterate through remaining words to construct bigrams
+        for secondword in remainingwords:
+            bigrams.append([firstword, secondword])
+# Loop throguh each pattern, if there is a match then return the search structure
+    return(bigrams)
+
+
+pairWords(individualKeyWords)
+# We want to rewrite how we pull words from our query
+# Let's look for adjectives and nouns that surround the adjectives
 
 print(adjPatterns, propnPatterns)
 
@@ -93,7 +159,7 @@ propnpropnPatterns = [i for i in pairPatterns(propnPatterns, propnPatterns)]
 allPatterns = adjPatterns + propnPatterns + adjpropnPatterns + propnadjPatterns + adjadjPatterns + propnpropnPatterns
 
 # Let#s take a look:
-allPatterns
+# allPatterns
 
 # Now we can initialize our matcher and add our patterns to it:
 matcher = Matcher(nlp.vocab)
